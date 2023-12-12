@@ -1,26 +1,41 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import server from "./server";
+import {ecdsaSign} from 'ethereum-cryptography/secp256k1-compat'
+import {keccak256} from 'ethereum-cryptography/keccak'
+import {toHex, utf8ToBytes} from 'ethereum-cryptography/utils'
 
-function Transfer({ address, setBalance }) {
+function Transfer({ address, setBalance, privateKey }) {
   const [sendAmount, setSendAmount] = useState("");
   const [recipient, setRecipient] = useState("");
 
   const setValue = (setter) => (evt) => setter(evt.target.value);
 
+  console.log('transfer outter private key', privateKey)
+
   async function transfer(evt) {
     evt.preventDefault();
 
+  console.log('transfer inner private key', privateKey)
+
     try {
-      const {
-        data: { balance },
-      } = await server.post(`send`, {
+      const params = {
         sender: address,
         amount: parseInt(sendAmount),
         recipient,
-      });
+      }
+      const hash = utf8ToBytes(JSON.stringify(params))
+      const signature = ecdsaSign(hash, privateKey).signature
+
+      console.log('hash signature', hash, signature)
+      params.hash = hash
+      params.signature = signature
+      
+      const {
+         balance ,
+      } = await server.post(`api/send`, params);
       setBalance(balance);
     } catch (ex) {
-      alert(ex.response.data.message);
+      console.error(ex.message);
     }
   }
 
